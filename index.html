@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>Vilmor Shop - Online Do'kon</title>
+    <style>
+        body{font-family:sans-serif;margin:0;padding:0;background:#f5f5f5;}
+        header{text-align:center;padding:30px;background:#333;color:white;}
+        h1{margin:0;}
+        .container{max-width:900px;margin:20px auto;padding:20px;background:white;border-radius:8px;}
+        input, select, button{padding:8px;margin:5px 0; width:100%; box-sizing:border-box;}
+        button{cursor:pointer;}
+        .admin-card{border:1px solid #ccc;padding:10px;margin:10px 0;border-radius:6px;background:#fafafa;}
+        #adminPanel, #trackingPanel{display:none;}
+    </style>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<header>
+    <h1>Vilmor Shop - Online Do'kon</h1>
+</header>
+
+<div class="container">
+    <!-- Kirish tugmalari -->
+    <div id="homePanel">
+        <button onclick="showTracking()">Mijozlar Paneli</button>
+        <button onclick="adminLogin()">Admin Paneli</button>
+    </div>
+
+    <!-- Mijozlar paneli -->
+    <div id="trackingPanel">
+        <h2>Buyurtma holatini tekshirish</h2>
+        <input type="text" id="trackingNumber" placeholder="Tracking raqam">
+        <button onclick="trackOrder()">Tekshirish</button>
+        <div id="orderStatus"></div>
+        <button onclick="backHome()">Orqaga</button>
+    </div>
+
+    <!-- Admin paneli -->
+    <div id="adminPanel">
+        <h2>Admin Panel</h2>
+        <div id="addOrderDiv">
+            <input type="text" id="newTracking" placeholder="Tracking #">
+            <input type="text" id="newCustomer" placeholder="Mijoz ismi">
+            <input type="text" id="newPhone" placeholder="Telefon raqam">
+            <input type="text" id="newAddress" placeholder="Manzil">
+            <input type="text" id="newStatus" placeholder="Holat">
+            <button onclick="addOrder()">Buyurtma qo‘shish</button>
+        </div>
+        <h3>Buyurtmalar</h3>
+        <div id="ordersTable"></div>
+        <button onclick="logoutAdmin()">Chiqish</button>
+    </div>
+</div>
+
+<script>
+    // Firebase config siz bergan
+    const firebaseConfig = {
+  apiKey: "AIzaSyBsg6XieZVburEUPb7jzMsQY4AmFmyj_rA",
+  authDomain: "vilmorshop-21df5.firebaseapp.com",
+  projectId: "vilmorshop-21df5",
+  storageBucket: "vilmorshop-21df5.firebasestorage.app",
+  messagingSenderId: "215560267090",
+  appId: "1:215560267090:web:7871303c6508cbc391468b",
+  measurementId: "G-Y7W7F7QG0Y"
+};
+
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const adminPassword = "12345"; // admin parolini o'zgartiring
+    let adminLoggedIn = false;
+
+    function showTracking(){
+        document.getElementById("homePanel").style.display="none";
+        document.getElementById("trackingPanel").style.display="block";
+    }
+
+    function adminLogin(){
+        const pass = prompt("Admin parolini kiriting:");
+        if(pass === adminPassword){
+            adminLoggedIn = true;
+            document.getElementById("homePanel").style.display="none";
+            document.getElementById("adminPanel").style.display="block";
+            displayOrders();
+        } else {
+            alert("Parol xato!");
+        }
+    }
+
+    function backHome(){
+        document.getElementById("trackingPanel").style.display="none";
+        document.getElementById("homePanel").style.display="block";
+        document.getElementById("orderStatus").innerHTML="";
+    }
+
+    function logoutAdmin(){
+        adminLoggedIn = false;
+        document.getElementById("adminPanel").style.display="none";
+        document.getElementById("homePanel").style.display="block";
+    }
+
+    // Mijoz tracking
+    function trackOrder(){
+        const input = document.getElementById("trackingNumber").value.trim();
+        const statusDiv = document.getElementById("orderStatus");
+
+if(input===""){
+            statusDiv.innerHTML="Iltimos, tracking raqamni kiriting.";
+            return;
+        }
+        db.collection("orders").where("tracking","==",input).get().then(snapshot=>{
+            if(snapshot.empty){
+                statusDiv.innerHTML="Bunday tracking raqam topilmadi.";
+                return;
+            }
+            snapshot.forEach(doc=>{
+                const order = doc.data();
+                statusDiv.innerHTML=`
+                    <p><strong>Mijoz:</strong> ${order.customer}</p>
+                    <p><strong>Telefon:</strong> ${order.phone}</p>
+                    <p><strong>Manzil:</strong> ${order.address}</p>
+                    <p><strong>Holat:</strong> ${order.status}</p>
+                    <p><strong>Vaqt:</strong> ${order.time}</p>
+                `;
+            });
+        });
+    }
+
+    // Buyurtma qo'shish (admin)
+    function addOrder(){
+        const tracking = document.getElementById("newTracking").value.trim();
+        const customer = document.getElementById("newCustomer").value.trim();
+        const phone = document.getElementById("newPhone").value.trim();
+        const address = document.getElementById("newAddress").value.trim();
+        const status = document.getElementById("newStatus").value.trim();
+
+        if(!tracking || !customer || !phone || !address || !status){
+            alert("Iltimos, barcha maydonlarni to‘ldiring.");
+            return;
+        }
+        const now = new Date();
+        const timeString = now.toLocaleString();
+
+        db.collection("orders").add({
+            tracking,
+            customer,
+            phone,
+            address,
+            status,
+            time: timeString
+        }).then(()=>{
+            alert("Buyurtma qo‘shildi!");
+            document.getElementById("newTracking").value="";
+            document.getElementById("newCustomer").value="";
+            document.getElementById("newPhone").value="";
+            document.getElementById("newAddress").value="";
+            document.getElementById("newStatus").value="";
+            displayOrders();
+        }).catch((error)=>{
+            console.error("Xato: ", error);
+            alert("Buyurtma qo‘shishda xato yuz berdi!");
+        });
+    }
+
+    // Buyurtmalarni ko'rsatish (admin)
+    function displayOrders(){
+        const tableDiv = document.getElementById("ordersTable");
+        tableDiv.innerHTML = "";
+        db.collection("orders").orderBy("time","desc").get().then(snapshot=>{
+            if(snapshot.empty){
+                tableDiv.innerHTML="<p>Hozircha buyurtmalar mavjud emas.</p>";
+                return;
+            }
+            snapshot.forEach((doc,index)=>{
+                const order = doc.data();
+                const card = document.createElement("div");
+                card.className = "admin-card";
+                card.innerHTML = `
+                    <p><strong>ID:</strong> ${index+1}</p>
+                    <p><strong>Tracking #:</strong> ${order.tracking}</p>
+                    <p><strong>Mijoz:</strong> ${order.customer}</p>
+                    <p><strong>Telefon:</strong> ${order.phone}</p>
+                    <p><strong>Manzil:</strong> ${order.address}</p>
+                    <p><strong>Holat:</strong> ${order.status}</p>
+                    <p><strong>Vaqt:</strong> ${order.time}</p>
+                    <button onclick="deleteOrder('${doc.id}')">O‘chirish</button>
+                `;
+                tableDiv.appendChild(card);
+            });
+        });
+    }
+
+    // Buyurtmani o'chirish (admin)
+    function deleteOrder(id){
+        if(confirm("Rostdan o‘chirmoqchimisiz?")){
+            db.collection("orders").doc(id).delete().then(()=>{
+                alert("Buyurtma o‘chirildi!");
+                displayOrders();
+            }).catch((error)=>{
+                console.error(error);
+                alert("Xato yuz berdi!");
+            });
+        }
+    }
+
+</script>
+
+</body>
+</html>
